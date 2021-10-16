@@ -4,10 +4,23 @@ from selenium.webdriver import Firefox
 from selenium.webdriver.firefox.options import Options
 import time
 import pandas as pd
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+
+driver = webdriver.Chrome(ChromeDriverManager().install())
+
+
+import logging
+logging.basicConfig(filename='test.log',format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.info("処理を開始します。")
+logging.critical('criticalメッセージ')
+logging.error('errorメッセージ')
+logging.warning('warningメッセージ')
+logging.debug('debugメッセージ') 
+
 
 # Chromeを起動する関数
-
-
 def set_driver(driver_path, headless_flg):
     if "chrome" in driver_path:
           options = ChromeOptions()
@@ -36,7 +49,7 @@ def set_driver(driver_path, headless_flg):
 
 
 def main():
-    search_keyword = "高収入"
+    search_keyword = input("キーワードを入れてください > ")
     # driverを起動
     if os.name == 'nt': #Windows
         driver = set_driver("chromedriver.exe", False)
@@ -57,7 +70,7 @@ def main():
     # 検索ボタンクリック
     driver.find_element_by_class_name("topSearch__button").click()
 
-      
+    df = pd.DataFrame()
         
     while True:
         name_list = driver.find_elements_by_class_name("cassetteRecruit__name")
@@ -66,15 +79,28 @@ def main():
         print(len(name_list))
         for name,copy in zip(name_list,copy_list):
             print(name.text,copy.text)
+
+            df = df.append({
+                "会社名": name.text, 
+                "求人タイトル": copy.text,
+            }, ignore_index=True)
                         
         try:
             time.sleep(5)
             driver.execute_script('document.querySelector(".karte-close").click()')
-            driver.find_element_by_class_name("iconFont--arrowLeft").click()
         except:
-            print("最終ページです")
-            break
+            pass
+            try:
+                time.sleep(5)
+                element = driver.find_element_by_class_name('iconFont--arrowLeft')
+                driver.execute_script('arguments[0].click();', element)
+            except:
+        
+                print("最終ページです")
+                break
 
+
+    df.to_csv("記事一覧.csv", encoding="utf-8_sig")             
 
 # 直接起動された場合はmain()を起動(モジュールとして呼び出された場合は起動しないようにするため)
 if __name__ == "__main__":
