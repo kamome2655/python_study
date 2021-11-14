@@ -8,7 +8,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from webdriver_manager.chrome import ChromeDriverManager
 
 LOG_FILE_PATH = "./log/log_{datetime}.log"
-EXP_CSV_PATH="./exp_list_{search_keyword}_{datetime}.csv"
+EXP_CSV_PATH="./exp_list_{datetime}.csv"
 log_file_path=LOG_FILE_PATH.format(datetime=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
 
 ### Chromeを起動する関数
@@ -44,50 +44,45 @@ def log(txt):
 ### main処理
 def main():
     log("処理開始")
-    search_keyword=input("検索キーワードを入力してください：")
-    log("検索キーワード:{}".format(search_keyword))
     # driverを起動
     driver = set_driver("chromedriver.exe", False)
     # Webサイトを開く
-    driver.get("https://www.amazon.co.jp/ref=ap_frn_logo")
+    driver.get("https://www.amazon.co.jp/gp/bestsellers/kitchen/ref=zg_bs_pg_1?ie=UTF8&pg=1")
     time.sleep(5)
     
-    # 検索窓に入力
-    driver.find_element_by_id("twotabsearchtextbox").send_keys(search_keyword)
+    df = pd.DataFrame()
 
-    # 検索ボタンクリック
-    driver.find_element_by_id("nav-search-submit-button").click()
-
-
-    # ページ終了まで繰り返し取得
-    exp_name_list = []
-    exp_price_list = []
-
+    exp_link_list = []
+    
     count = 0
     success = 0
     fail = 0
-    while True:
-        # 
-        name_list = driver.find_elements_by_css_selector(".a-size-base-plus.a-color-base.a-text-normal")
-        price_list = driver.find_elements_by_css_selector(".a-price")        
-                
-        # 1ページ分繰り返し
-        for name,price in zip(name_list,price_list):
-            try:
-                # try~exceptはエラーの可能性が高い箇所に配置
-                exp_name_list.append(name.text)
-                exp_price_list.append(price.text)
-                                
-                log(f"{count}件目成功 : {name.text}")
-                success+=1
-            except Exception as e:
-                log(f"{count}件目失敗 : {name.text}")
-                log(e)
-                fail+=1
-            finally:
-                # finallyは成功でもエラーでも必ず実行
-                count+=1
 
+    while True:
+        item_name = driver.find_elements_by_class_name("zg-item-immersion")
+        for item in item_name:
+            link = item.find_element_by_tag_name("a").get_attribute("href")
+            driver2 = set_driver("chromedriver.exe", False)
+            driver2.get(link)
+            item_name = driver2.find_element_by_id("productTitle").text
+            item_price = driver2.find_element_by_css_selector(".a-lineitem.a-align-top").text
+            item_delivery = driver2.find_element_by_id("deliveryBlockMessage").text
+            item_prime = driver2.find_element_by_id("deliveryPriceBadging_feature_div").get_attribute("value")
+            item_asin = driver2.find_element_by_id("ASIN").get_attribute("value")
+            print(item_name,item_price,item_delivery,item_prime,item_asin)
+            driver2.quit()
+                
+                
+            df = df.append({
+                "商品名": item_name,
+                "価格": item_price,
+                "リードタイム": item_delivery,
+                "prime": item_prime,
+                "ASIN": item_asin,
+            }, ignore_index=True)
+                
+      
+            
         # 次のページボタンがあればクリックなければ終了
         next_page = driver.find_elements_by_xpath("//ul/li[@class='a-last']/a")
         time.sleep(5)
@@ -100,11 +95,8 @@ def main():
 
     # CSV出力
     now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    df = pd.DataFrame({"商品名":exp_name_list,
-                       "価格":exp_price_list}) 
-
-    df.to_csv(EXP_CSV_PATH.format(search_keyword=search_keyword,datetime=
-                                  now), encoding="utf-8-sig")
+    
+    df.to_csv(EXP_CSV_PATH.format(datetime=now), encoding="utf-8-sig")
     log(f"処理完了 成功件数: {success} 件 / 失敗件数: {fail} 件")
     
 # 直接起動された場合はmain()を起動(モジュールとして呼び出された場合は起動しないようにするため)
