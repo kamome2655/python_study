@@ -1,0 +1,28 @@
+<html>
+    <head>
+        <title>amazonランキング商品</title>
+        <link rel="stylesheet" href="./style2.css">
+    </head>
+    <body>
+        <h2>amazonランキング商品</h2>
+        <div class="">
+            検索URL<input id="search_url" type="text"></input>
+            <button id = "search">検索</button><br/>
+        </div>
+        <div>
+            <textarea id="result" class="log-view-area"></textarea>
+        </div>
+        <script type="text/javascript" src="./eel.js"></script>
+        <script>
+            search.addEventListener('click', () => {
+                eel.main(search_url.value)
+            })
+            
+            eel.expose(view_log_js)
+            function view_log_js(text){
+                result.value += text + "\n"
+            }
+            
+        </script>
+    </body>
+</html>

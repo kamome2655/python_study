@@ -6,6 +6,7 @@ import datetime
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from webdriver_manager.chrome import ChromeDriverManager
+import eel
 
 LOG_FILE_PATH = "./log/log_{datetime}.log"
 EXP_CSV_PATH="./exp_list_{datetime}.csv"
@@ -42,18 +43,20 @@ def log(txt):
 
 
 ### main処理
-def main():
+def main(url_name):
     log("処理開始")
     # driverを起動
     driver = set_driver("chromedriver.exe", False)
     # Webサイトを開く
-    driver.get("https://www.amazon.co.jp/gp/bestsellers/kitchen/ref=zg_bs_pg_1?ie=UTF8&pg=1")
+    driver.get(url_name)
     time.sleep(5)
+    
+    eel.view_log_js("処理開始")
+    
     
     df = pd.DataFrame()
 
-    exp_link_list = []
-    
+     
     count = 0
     success = 0
     fail = 0
@@ -61,25 +64,35 @@ def main():
     while True:
         item_name = driver.find_elements_by_class_name("zg-item-immersion")
         for item in item_name:
-            link = item.find_element_by_tag_name("a").get_attribute("href")
-            driver2 = set_driver("chromedriver.exe", False)
-            driver2.get(link)
-            item_name = driver2.find_element_by_id("productTitle").text
-            item_price = driver2.find_element_by_css_selector(".a-lineitem.a-align-top").text
-            item_delivery = driver2.find_element_by_id("deliveryBlockMessage").text
-            item_prime = driver2.find_element_by_id("deliveryPriceBadging_feature_div").get_attribute("value")
-            item_asin = driver2.find_element_by_id("ASIN").get_attribute("value")
-            print(item_name,item_price,item_delivery,item_prime,item_asin)
-            driver2.quit()
+            try:
+                link = item.find_element_by_tag_name("a").get_attribute("href")
+                driver2 = set_driver("chromedriver.exe", False)
+                driver2.get(link)
+                item_name = driver2.find_element_by_id("productTitle").text
+                item_price = driver2.find_element_by_css_selector(".a-lineitem.a-align-top").text
+                item_delivery = driver2.find_element_by_id("deliveryBlockMessage").text
+                item_asin = driver2.find_element_by_id("ASIN").get_attribute("value")
+                print(item_name,item_price,item_delivery,item_asin)
+                driver2.quit()
+                log(f"{count}件目成功 : {item_name}")
+                success+=1
+                eel.view_log_js(f"{count}件目成功 ") 
                 
+                df = df.append({
+                    "商品名": item_name,
+                    "価格": item_price,
+                    "リードタイム": item_delivery,
+                    "ASIN": item_asin,
+                }, ignore_index=True)
                 
-            df = df.append({
-                "商品名": item_name,
-                "価格": item_price,
-                "リードタイム": item_delivery,
-                "prime": item_prime,
-                "ASIN": item_asin,
-            }, ignore_index=True)
+            except Exception as e:
+                log(f"{count}件目失敗 : {item_name}")
+                log(e)
+                fail+=1
+                eel.view_log_js(f"{count}件目失敗 ") 
+            finally:
+                # finallyは成功でもエラーでも必ず実行
+                count+=1
                 
       
             
@@ -91,6 +104,7 @@ def main():
             driver.get(next_page_link)
         else:
             log("最終ページです。終了します。")
+            eel.view_log_js("最終ページです。終了します。")
             break
 
     # CSV出力
@@ -98,7 +112,5 @@ def main():
     
     df.to_csv(EXP_CSV_PATH.format(datetime=now), encoding="utf-8-sig")
     log(f"処理完了 成功件数: {success} 件 / 失敗件数: {fail} 件")
+    eel.view_log_js(f"処理完了 成功件数: {success} 件 / 失敗件数: {fail} 件")
     
-# 直接起動された場合はmain()を起動(モジュールとして呼び出された場合は起動しないようにするため)
-if __name__ == "__main__":
-    main()
